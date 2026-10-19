@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneBoard | Notes Rescue</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6fb;
+      color: #182033;
+    }
+    header {
+      background: #172554;
+      color: white;
+      padding: 24px 18px;
+    }
+    header h1 { margin: 0 0 8px; }
+    header p { margin: 0; color: #dbeafe; }
+    main { max-width: 900px; margin: auto; padding: 20px; }
+    .panel {
+      background: white;
+      padding: 18px;
+      margin-bottom: 18px;
+      border-radius: 14px;
+      box-shadow: 0 3px 14px #1820330b;
+    }
+    input, select, button {
+      font: inherit;
+      padding: 11px;
+      border-radius: 8px;
+    }
+    input, select {
+      border: 1px solid #cbd5e1;
+      background: white;
+      width: 100%;
+      margin: 5px 0 12px;
+    }
+    button {
+      border: 0;
+      background: #1d4ed8;
+      color: white;
+      cursor: pointer;
+      margin: 4px 3px 4px 0;
+    }
+    button:hover { background: #1e40af; }
+    .secondary { background: #475569; }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filters button { background: #e2e8f0; color: #172554; }
+    .filters button.active { background: #1d4ed8; color: white; }
+    .note {
+      border: 1px solid #e2e8f0;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+    .note h3 { margin: 0 0 8px; }
+    .meta { color: #64748b; font-size: 14px; }
+    .empty { color: #64748b; padding: 12px 0; }
+    .tag {
+      font-size: 12px;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 4px 8px;
+      border-radius: 20px;
+    }
+    footer { text-align: center; padding: 20px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📚 OneBoard</h1>
+    <p>Your class, organized. Find notes without scrolling chats.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>🔎 Find your notes</h2>
+      <input id="search" placeholder="Search title, subject, topic or unit...">
+      <div id="filters" class="filters"></div>
+      <p id="count" class="meta"></p>
+      <div id="notes"></div>
+    </section>
+
+    <section class="panel">
+      <h2>📤 Notes Rescue</h2>
+      <p>Archive a notes file shared in your class group.</p>
+      <form id="uploadForm">
+        <label for="title">Note title</label>
+        <input id="title" required placeholder="e.g. Ohm's Law Notes">
+
+        <label for="subject">Subject</label>
+        <select id="subject">
+          <option>Basic Electrical</option>
+          <option>Mathematics</option>
+          <option>Physics</option>
+          <option>Engineering Drawing</option>
+          <option>Computer Science</option>
+          <option>Other</option>
+        </select>
+
+        <label for="unit">Unit or topic</label>
+        <input id="unit" placeholder="e.g. Unit 2">
+
+        <label for="file">Choose a PDF or image</label>
+        <input id="file" type="file"
+          accept=".pdf,.png,.jpg,.jpeg,.webp" required>
+
+        <button type="submit">Add to this demo</button>
+      </form>
+      <p id="status" class="meta">
+        Demo mode: uploaded files are only available in this browser session.
+      </p>
+    </section>
+  </main>
+
+  <footer>OneBoard · Built for students, by students</footer>
+
+  <script>
+    const notes = [
+      {
+        id: 1,
+        title: "Ohm's Law Notes",
+        subject: "Basic Electrical",
+        unit: "Current, voltage and resistance",
+        date: "Sample note",
+        keywords: "ohms law electricity circuit"
+      },
+      {
+        id: 2,
+        title: "Engineering Maths - Unit 2",
+        subject: "Mathematics",
+        unit: "Differentiation",
+        date: "Sample note",
+        keywords: "math calculus derivatives"
+      },
+      {
+        id: 3,
+        title: "Physics Lab Record",
+        subject: "Physics",
+        unit: "Lab preparation",
+        date: "Sample note",
+        keywords: "experiment record practical"
+      },
+      {
+        id: 4,
+        title: "Engineering Drawing Practice",
+        subject: "Engineering Drawing",
+        unit: "Projection basics",
+        date: "Sample note",
+        keywords: "drawing projections graphics"
+      }
+    ];
+
+    let activeSubject = "All";
+    let nextId = 5;
+    const localFiles = new Map();
+
+    const searchInput = document.getElementById("search");
+    const notesArea = document.getElementById("notes");
+    const filtersArea = document.getElementById("filters");
+    const countArea = document.getElementById("count");
+    const status = document.getElementById("status");
+
+    function renderFilters() {
+      const subjects = ["All", ...new Set(notes.map(n => n.subject))];
+      filtersArea.innerHTML = "";
+
+      subjects.forEach(subject => {
+        const button = document.createElement("button");
+        button.textContent = subject;
+        button.className =
+          subject === activeSubject ? "active" : "";
+        button.onclick = () => {
+          activeSubject = subject;
+          render();
+        };
+        filtersArea.appendChild(button);
+      });
+    }
+
+    function render() {
+      renderFilters();
+      const query = searchInput.value.trim().toLowerCase();
+
+      const filtered = notes.filter(note => {
+        const text = [
+          note.title, note.subject, note.unit, note.keywords
+        ].join(" ").toLowerCase();
+
+        return text.includes(query) &&
+          (activeSubject === "All" ||
+           note.subject === activeSubject);
+      });
+
+      countArea.textContent =
+        `${filtered.length} note(s) found`;
+
+      notesArea.innerHTML = "";
+
+      if (!filtered.length) {
+        notesArea.innerHTML =
+          '<p class="empty">No matching notes. Try another search.</p>';
+        return;
+      }
+
+      filtered.forEach(note => {
+        const card = document.createElement("article");
+        card.className = "note";
+
+        const heading = document.createElement("h3");
+        heading.textContent = note.title;
+
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = note.subject;
+
+        const details = document.createElement("p");
+        details.className = "meta";
+        details.textContent = `${note.unit} · ${note.date}`;
+
+        card.append(heading, tag, details);
+
+        if (localFiles.has(note.id)) {
+          const open = document.createElement("button");
+          open.textContent = "Open file";
+          open.onclick = () =>
+            window.open(localFiles.get(note.id), "_blank");
+          card.appendChild(open);
+        }
+
+        const share = document.createElement("button");
+        share.className = "secondary";
+        share.textContent = "Share to WhatsApp";
+        share.onclick = () => shareNote(note);
+        card.appendChild(share);
+
+        notesArea.appendChild(card);
+      });
+    }
+
+    function shareNote(note) {
+      const message =
+        `📚 OneBoard Notes\n` +
+        `Title: ${note.title}\n` +
+        `Subject: ${note.subject}\n` +
+        `Topic: ${note.unit}\n\n` +
+        `Find it in OneBoard: ${location.href}`;
+
+      const url =
+        "https://wa.me/?text=" + encodeURIComponent(message);
+
+      window.open(url, "_blank");
+    }
+
+    document.getElementById("uploadForm").onsubmit = event => {
+      event.preventDefault();
+
+      const file = document.getElementById("file").files[0];
+      if (!file) return;
+
+      const allowed = [
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/webp"
+      ];
+
+      if (!allowed.includes(file.type)) {
+        status.textContent = "Please choose a PDF or supported image.";
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        status.textContent = "For this demo, files must be under 10 MB.";
+        return;
+      }
+
+      const id = nextId++;
+      const note = {
+        id,
+        title: document.getElementById("title").value.trim(),
+        subject: document.getElementById("subject").value,
+        unit: document.getElementById("unit").value.trim() || "General",
+        date: "Just added",
+        keywords: file.name
+      };
+
+      if (!note.title) return;
+
+      notes.unshift(note);
+      localFiles.set(id, URL.createObjectURL(file));
+
+      event.target.reset();
+      activeSubject = "All";
+      searchInput.value = "";
+      status.textContent =
+        "Added to this session. It is not uploaded to a shared server.";
+      render();
+    };
+
+    searchInput.addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>
+
